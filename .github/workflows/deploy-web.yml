@@ -1,0 +1,95 @@
+name: Deploy Maru Ghar Website
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'admin.html'
+      - 'firebase-config.js'
+      - 'manifest.webmanifest'
+      - 'maru-ghar-backend.js'
+      - 'assets/**'
+      - '.github/workflows/deploy-web.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: maru-ghar-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare website files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p _site/assets
+
+          test -s index.html
+          test -s admin.html
+          test -s firebase-config.js
+          test -s manifest.webmanifest
+
+          cp index.html admin.html firebase-config.js manifest.webmanifest _site/
+
+          if [ -f assets/maru-ghar-backend.js ]; then
+            cp -R assets/. _site/assets/
+          elif [ -f maru-ghar-backend.js ]; then
+            cp maru-ghar-backend.js _site/assets/
+          else
+            echo "::error::maru-ghar-backend.js was not found."
+            exit 1
+          fi
+
+          if [ -f maru-ghar-logo.svg ]; then
+            cp maru-ghar-logo.svg _site/
+          fi
+
+          if [ -f icon.png ]; then
+            cp icon.png _site/
+          fi
+
+          if [ -f maru-ghar-approved-app-icon.png ]; then
+            cp maru-ghar-approved-app-icon.png _site/
+          fi
+
+          if [ -f splash.png ]; then
+            cp splash.png _site/
+          fi
+
+          test -s _site/index.html
+          test -s _site/admin.html
+          test -s _site/firebase-config.js
+          test -s _site/manifest.webmanifest
+          test -s _site/assets/maru-ghar-backend.js
+
+          echo "Website files prepared successfully."
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
